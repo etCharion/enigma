@@ -5,6 +5,9 @@ Statická webová aplikace simulující šifrovací stroj **Enigma I**: rotory *
 Kódování i dekódování, vizualizace cesty signálu, rychlý mód i pozorování krok za krokem.
 Krokování rotorů je zjednodušené — bez double-stepping anomálie.
 
+**Živá verze:** <https://etcharion.github.io/enigma/> — nasazuje se automaticky
+z větve `main` přes GitHub Actions (`.github/workflows/pages.yml`, před nasazením běží testy).
+
 Viz [PLAN.md](PLAN.md) — kompletní plán projektu, pravidla jádra, testovací strategie a rozdělení práce.
 
 ## Jak je vidět cesta signálu
