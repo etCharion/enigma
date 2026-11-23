@@ -1,0 +1,611 @@
+/* ═══════════════════════════════════════════════════════════════
+   ENIGMA I — historický vzhled: tmavý bakelit, mosaz, žárovky
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg: #161009;
+  --panel: #241b10;
+  --panel-2: #1c150c;
+  --edge: #4d3c1f;
+  --brass: #c9a227;
+  --brass-dim: #8a6d1f;
+  --cream: #ece0c4;
+  --dim: #a8946b;
+  --lamp-off: #3a2d15;
+  --lamp-on: #ffd766;
+  --glow: rgba(255, 196, 64, 0.65);
+  --danger: #c0503a;
+  --mono: "Courier New", ui-monospace, monospace;
+  --serif: Georgia, "Times New Roman", serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--cream);
+  font-family: var(--serif);
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(201, 162, 39, 0.10), transparent 60%),
+    radial-gradient(900px 600px at 100% 110%, rgba(120, 80, 20, 0.12), transparent 60%),
+    var(--bg);
+}
+
+/* ── hlavička ─────────────────────────────────────────────── */
+.topbar {
+  padding: 16px 22px 14px;
+  text-align: center;
+  border-bottom: 2px solid var(--edge);
+  background: linear-gradient(180deg, #2a2013, #191208);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+}
+.topbar h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: 0.38em;
+  padding-left: 0.38em; /* vyrovná prázdno po posledním písmenu → opravdu střed */
+  color: var(--brass);
+  text-shadow: 0 1px 0 #000, 0 0 18px rgba(201, 162, 39, 0.35);
+}
+
+/* přepínač módu — sedí v panelu nastavení pod titulkem */
+.mode-switch { display: flex; flex-direction: column; gap: 6px; }
+.mode-btn {
+  width: 100%;
+  text-align: left;
+  font-family: var(--serif);
+  font-size: 13.5px;
+  padding: 8px 12px;
+  color: var(--dim);
+  background: linear-gradient(180deg, #2e2414, #1d1509);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.mode-btn:hover { color: var(--cream); border-color: var(--brass-dim); }
+.mode-btn.active {
+  color: #1a1206;
+  background: linear-gradient(180deg, #e5c558, #b8912a);
+  border-color: var(--brass);
+  font-weight: bold;
+  box-shadow: 0 0 14px rgba(201, 162, 39, 0.45);
+}
+
+/* ── rozložení ────────────────────────────────────────────── */
+.layout {
+  position: relative; /* kvůli overlayi se zářivými linkami cesty */
+  display: grid;
+  gap: 14px;
+  padding: 16px 22px 22px;
+  grid-template-columns: 300px minmax(430px, 1fr) 360px;
+  grid-template-areas:
+    "settings rotors plugboard"
+    "machine  machine machine";
+  max-width: 1560px;
+  margin: 0 auto;
+}
+.settings { grid-area: settings; }
+.rotors-panel { grid-area: rotors; }
+.plugboard-panel { grid-area: plugboard; }
+.machine-panel { grid-area: machine; }
+
+@media (max-width: 1400px) {
+  .layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "settings plugboard"
+      "rotors rotors"
+      "machine machine";
+  }
+}
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; grid-template-areas: "settings" "rotors" "plugboard" "machine"; }
+}
+
+.panel {
+  background: linear-gradient(165deg, #2b2113 0%, var(--panel) 45%, var(--panel-2) 100%);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: inset 0 1px 0 rgba(236, 224, 196, 0.06), inset 0 0 0 1px rgba(0,0,0,0.55), 0 8px 20px rgba(0,0,0,0.5);
+}
+.panel h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+/* titulek panelu + otazník s nápovědou vpravo */
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--edge);
+}
+.panel-head h2 { flex: 1 1 auto; min-width: 0; }
+
+/* ── nápověda schovaná pod otazníkem ──────────────────────── */
+.help { position: relative; flex: 0 0 auto; }
+.help > summary {
+  list-style: none;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  color: var(--dim);
+  background: #120d06;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  cursor: pointer;
+  user-select: none;
+}
+.help > summary::-webkit-details-marker { display: none; }
+.help > summary::marker { content: ""; }
+.help > summary:hover { color: var(--cream); border-color: var(--brass-dim); }
+.help[open] > summary { color: #1a1206; background: var(--brass); border-color: var(--brass); }
+.help-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: min(340px, 78vw);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cream);
+  background: #1b1409;
+  border: 1px solid var(--brass-dim);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.72);
+}
+/* v levém úzkém sloupci (3 sloupcové rozložení) roste popover doprava,
+   aby nevyčníval z okna doleva */
+@media (min-width: 1401px) {
+  .settings .help-body { left: 0; right: auto; }
+}
+
+.help-body p { margin: 0 0 7px; }
+.help-body p:last-child { margin-bottom: 0; }
+.help-body b { color: var(--brass); }
+.help-body code, .help-body .mono { font-family: var(--mono); color: var(--lamp-on); }
+.panel h3 { margin: 12px 0 6px; font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.hintInline { font-size: 11px; color: var(--dim); font-style: italic; }
+.warn { color: #ff9b8a; font-weight: bold; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ── nastavení ────────────────────────────────────────────── */
+.rotor-order { display: flex; gap: 8px; }
+.rotor-order label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim); flex: 1; }
+select, input, textarea {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--cream);
+  background: #120d06;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+}
+select:focus, input:focus, textarea:focus { border-color: var(--brass); box-shadow: 0 0 8px rgba(201,162,39,0.3); }
+textarea { width: 100%; resize: vertical; }
+
+.positions { display: flex; gap: 10px; }
+.pos-ctl { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; }
+.pos-label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+.pos-ctl input { width: 46px; text-align: center; font-size: 20px; font-weight: bold; color: var(--brass); text-transform: uppercase; }
+.pos-btn {
+  width: 46px; padding: 2px 0; cursor: pointer;
+  background: linear-gradient(180deg, #33281400, #0000), #241b0d;
+  color: var(--brass); border: 1px solid var(--edge); border-radius: 6px; font-size: 10px;
+}
+.pos-btn:hover { border-color: var(--brass); }
+
+.small-btn, .controls button {
+  font-family: var(--serif);
+  font-size: 13px;
+  padding: 7px 12px;
+  color: var(--cream);
+  background: linear-gradient(180deg, #332814, #211809);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.small-btn:hover, .controls button:hover:not(:disabled) { border-color: var(--brass); color: #fff; }
+.controls button:disabled { opacity: 0.4; cursor: default; }
+
+/* ── rotory ───────────────────────────────────────────────── */
+.rotor-stack { display: flex; flex-direction: column; gap: 8px; }
+
+.rotor-row {
+  display: grid;
+  grid-template-columns: 176px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(77, 60, 31, 0.7);
+  border-radius: 10px;
+}
+.rotor-row.reflector-row { background: rgba(120, 30, 15, 0.14); border-color: rgba(160, 70, 45, 0.5); }
+
+.rotor-head { display: flex; align-items: center; gap: 8px; }
+
+/* pořadí, v jakém signál řádkem prochází (1 = pravé kolo) */
+.step-badge {
+  flex: 0 0 auto;
+  min-width: 21px;
+  height: 21px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--brass);
+  background: #120d06;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+}
+.reflector-row .step-badge { border-radius: 6px; color: #e08a6a; border-color: rgba(160, 70, 45, 0.6); }
+.rotor-name { font-size: 13px; color: var(--dim); line-height: 1.25; }
+.rotor-name b { display: block; font-size: 16px; color: var(--cream); letter-spacing: 0.06em; }
+
+/* kotouč, který se otáčí při kroku */
+.drum {
+  position: relative;
+  width: 44px; height: 44px; flex: 0 0 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4a3a1c, #241a0c 70%);
+  border: 2px solid var(--brass-dim);
+  box-shadow: inset 0 0 8px #000, 0 2px 5px rgba(0,0,0,0.6);
+}
+.drum::after { /* značka na kotouči */
+  content: "";
+  position: absolute;
+  left: 50%; top: 3px;
+  width: 4px; height: 12px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--brass);
+  box-shadow: 0 0 6px rgba(201, 162, 39, 0.8);
+}
+.drum-inner {
+  position: absolute; inset: 0;
+  transition: transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.drum-inner.spin { animation: drumspin 0.35s ease; }
+@keyframes drumspin { from { transform: rotate(0deg); } to { transform: rotate(13.846deg); } }
+
+.window {
+  width: 40px;
+  padding: 4px 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--lamp-on);
+  background: linear-gradient(180deg, #0d0a05, #1c150a);
+  border: 2px solid var(--brass-dim);
+  border-radius: 7px;
+  box-shadow: inset 0 0 10px #000, 0 0 10px rgba(255, 215, 102, 0.25);
+}
+.window.bump { animation: bump 0.35s ease; }
+@keyframes bump { 0% { transform: translateY(-6px); color: #fff; } 100% { transform: translateY(0); } }
+
+/* ── dvě sady kontaktů každého kola: strana P a strana L ──── */
+.faces { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.face { display: grid; grid-template-columns: 54px 1fr; gap: 6px; align-items: center; min-width: 0; }
+.face-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-align: right;
+  color: var(--dim);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.face-label b { color: var(--brass); font-size: 11.5px; }
+.reflector-row .face-label b { color: #e08a6a; }
+
+/* pás kontaktů A–Z (jedna strana kola) */
+.cells { display: grid; grid-template-columns: repeat(26, 1fr); gap: 2px; }
+.cell {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-align: center;
+  padding: 2px 0;
+  color: var(--dim);
+  background: rgba(236, 224, 196, 0.045);
+  border: 1px solid rgba(77, 60, 31, 0.5);
+  border-radius: 4px;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+  user-select: none;
+}
+
+/* pás drátků mezi pásy P a L: drátky vedou ze vstupní zdířky na výstupní.
+   Při kroku kola se celý svazek otočí o jednu buňku — písmena pásů stojí. */
+.wires { position: relative; height: 46px; min-width: 0; }
+.wires svg { display: block; width: 100%; height: 46px; }
+/* barvu, tloušťku i průhlednost drátku nese sám prvek (js/app.js), aby drátky
+   byly zlaté a rozsvěcely se i bez CSS; tady je jen pojistka a záře */
+.wire { fill: none; stroke-linecap: round; }
+.wire.lit { filter: drop-shadow(0 0 4px var(--step, #ffd166)); }
+.wire.v-slide { transition: transform 0.28s cubic-bezier(0.35, 0.85, 0.3, 1); }
+.wire.v-fade { transition: opacity 0.14s linear; }
+.face-w .face-label { color: var(--dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wire.v-slide, .wire.v-fade, .drum-inner, .window.bump { transition: none; animation: none; }
+}
+
+/* rozsvícené písmeno — barvu konkrétního kroku nese --step */
+.cell.hit {
+  background: var(--step, #ffd166);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: #171006;
+  font-weight: bold;
+  box-shadow: 0 0 12px var(--step, #ffd166), inset 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+/* ── plugboard ────────────────────────────────────────────── */
+.plugboard {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 6px;
+  padding: 12px 10px;
+  background: linear-gradient(180deg, #191008, #100b05);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+}
+.socket {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--dim);
+  background: radial-gradient(circle at 50% 42%, #050302 42%, #241a0c 46%, #0d0904 78%);
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  cursor: pointer;
+  user-select: none;
+}
+.socket:hover { border-color: var(--brass-dim); color: var(--cream); }
+/* vybraná zdířka = rozpracovaný kabel → čárkovaný kroužek, ne plné světlo */
+.socket.selected {
+  color: #1a1206;
+  background: radial-gradient(circle at 50% 42%, #fff3c4 30%, var(--brass) 70%);
+  font-weight: bold;
+  box-shadow: 0 0 12px var(--glow);
+  outline: 2px dashed rgba(255, 224, 140, 0.95);
+  outline-offset: 2px;
+}
+/* zdířka pod kurzorem: zeleně = kabel může vzniknout, červeně = nelze */
+.socket.preview-ok { outline: 2px dashed var(--lamp-on); outline-offset: 2px; color: var(--cream); }
+.socket.preview-bad { outline: 2px dashed #ff8a72; outline-offset: 2px; color: #ff9b8a; }
+/* druhý konec kabelu, na který míří kurzor */
+.socket.pairmate { border-color: var(--lamp-on); box-shadow: 0 0 10px rgba(255, 215, 102, 0.5); }
+.socket.plugged { color: var(--lamp-on); box-shadow: inset 0 0 8px rgba(255, 215, 102, 0.35); border-color: rgba(255, 215, 102, 0.5); }
+.socket.hit {
+  background: radial-gradient(circle at 50% 42%, #fff 4%, var(--step, #ffd166) 42%, var(--step, #ffd166) 100%);
+  color: #171006; font-weight: bold;
+  border-color: transparent;
+  box-shadow: 0 0 14px var(--step, #ffd166);
+}
+.cables { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.cables path { fill: none; stroke-linecap: round; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.7)); }
+
+/* hotový kabel — plný, sepnutý */
+.cables path.cable { stroke-width: 3; opacity: 0.9; }
+.cables path.cable.is-hover { stroke-width: 5; opacity: 1; }
+/* kabelem právě prochází signál → svítí barvou kroku */
+.cables path.cable.is-lit { stroke-width: 3.6; opacity: 1; }
+.cables path.cable-halo { stroke-width: 12; opacity: 0.5; filter: url(#wire-glow); }
+/* nově zapojený kabel krátce poblikne */
+.cables path.cable.is-fresh { animation: cablefresh 0.7s ease-out; }
+@keyframes cablefresh {
+  0% { stroke-width: 10; opacity: 1; }
+  100% { stroke-width: 3; opacity: 0.9; }
+}
+/* čárkovaný náhled rozpracovaného kabelu (vybraná zdířka → kurzor) */
+.cables path.cable-preview {
+  stroke-width: 2.6;
+  stroke-dasharray: 7 6;
+  opacity: 0.95;
+  animation: wireflow 0.9s linear infinite;
+}
+.cables path.cable-preview.is-bad { stroke-dasharray: 4 5; opacity: 0.85; }
+
+/* ── zářivé linky cesty signálu (SVG nad celým rozložením) ──
+   Každý krok cesty má svou barvu ve --step; stejnou barvou svítí
+   obě písmenka i spojnice mezi nimi. */
+.path-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
+}
+.path-overlay path { fill: none; stroke-linecap: round; }
+.path-overlay .wire { stroke-width: 3.2; }
+.path-overlay .wire-halo { stroke-width: 11; opacity: 0.45; filter: url(#wire-glow); }
+.path-overlay .wire-link {
+  stroke-width: 2.4;
+  stroke-dasharray: 7 6;
+  opacity: 0.9;
+  animation: wireflow 0.9s linear infinite;
+}
+.path-overlay .wire-dot { stroke: none; opacity: 0.95; }
+@keyframes wireflow { to { stroke-dashoffset: -13; } }
+@media (prefers-reduced-motion: reduce) {
+  .path-overlay .wire-link { animation: none; }
+  .cables path.cable-preview { animation: none; }
+  .cables path.cable.is-fresh { animation: none; }
+}
+
+/* barevný vzorek kroku v popisku */
+.swatch {
+  display: inline-block;
+  width: 9px; height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--step, #ffd166);
+  box-shadow: 0 0 7px var(--step, #ffd166);
+}
+
+.plug-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; max-height: 92px; overflow: auto; }
+.plug-list li {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 3px 9px;
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+  cursor: pointer;
+  background: #1d1509;
+}
+.plug-list li:hover { border-color: var(--danger); color: #ff9b8a; text-decoration: line-through; }
+.plug-list li::after { content: " ✕"; font-size: 11px; }
+
+/* ── stroj: vstup/pozorování/výstup │ lampovník + klávesnice │ krokování ── */
+.machine-panel {
+  padding: 18px;
+  background:
+    radial-gradient(700px 200px at 50% 0%, rgba(201, 162, 39, 0.08), transparent 70%),
+    linear-gradient(165deg, #2b2113, var(--panel-2));
+}
+.machine-grid {
+  display: grid;
+  /* postranní sloupce se roztahují, klávesnice zůstává ve středu */
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.machine-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.machine-center { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; }
+
+/* malé boxy po stranách klávesnice */
+.mini-box {
+  padding: 9px 11px 11px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(77, 60, 31, 0.7);
+  border-radius: 10px;
+}
+.mini-box h3 {
+  margin: 0 0 7px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.mini-box textarea { font-size: 14px; }
+.mini-box .row { margin-top: 2px; }
+.mini-box .small-btn { margin-top: 6px; font-size: 12.5px; padding: 6px 10px; }
+
+.step-buttons { display: flex; flex-direction: column; gap: 6px; }
+.step-buttons button { width: 100%; margin-top: 0; }
+
+.lampboard, .keyboard { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.kb-row { display: flex; gap: 9px; }
+
+.lamp {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 17px;
+  color: rgba(236, 224, 196, 0.35);
+  background: radial-gradient(circle at 38% 32%, #33270f, var(--lamp-off) 65%);
+  border: 2px solid #0c0803;
+  box-shadow: inset 0 2px 6px #000, 0 1px 0 rgba(236,224,196,0.08);
+  transition: background 0.08s, box-shadow 0.08s, color 0.08s;
+  user-select: none;
+}
+.lamp.lit {
+  color: #2a1c05;
+  font-weight: bold;
+  background: radial-gradient(circle at 42% 36%, #fff8dc, var(--lamp-on) 55%, #d99a1f 90%);
+  box-shadow: 0 0 22px 6px var(--glow), inset 0 0 6px rgba(255,255,255,0.7);
+}
+
+.key {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 19px;
+  color: var(--cream);
+  background: radial-gradient(circle at 38% 30%, #4d3d20, #241a0c 68%);
+  border: 2px solid var(--brass-dim);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.65), inset 0 1px 0 rgba(236,224,196,0.15);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.key:hover { border-color: var(--brass); }
+.key.pressed {
+  transform: translateY(3px);
+  background: radial-gradient(circle at 38% 30%, #6b5626, #2e2210 70%);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.7), inset 0 2px 6px #000;
+  color: var(--lamp-on);
+}
+
+/* ── výstup / popis kroku / historie ──────────────────────── */
+#text-output { font-size: 16px; letter-spacing: 0.12em; color: var(--lamp-on); background: #0f0b05; }
+
+.step-caption {
+  margin: 0;
+  padding: 9px 12px;
+  min-height: 40px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  background: #120d06;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  color: var(--cream);
+}
+.step-caption b { color: var(--lamp-on); }
+.step-caption .mono { font-family: var(--mono); }
+
+.history {
+  list-style: none;
+  margin: 0; padding: 6px;
+  max-height: 132px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: #120d06;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+}
+.history li { padding: 2px 6px; border-bottom: 1px dotted rgba(77, 60, 31, 0.5); color: var(--dim); }
+.history li:first-child { color: var(--cream); }
+.history li b { color: var(--lamp-on); }
+.history li .pos { color: var(--brass); }
+
+/* ── responsivita rozložení (až na konci, aby přebila základní pravidla) ── */
+/* na užších displejích se boxy přeskládají pod klávesnici */
+@media (max-width: 1000px) {
+  .machine-grid { grid-template-columns: 1fr; }
+  .machine-center { order: -1; }
+}
+/* malé displeje: zmenšené klávesy, aby se klávesnice vešla na šířku */
+@media (max-width: 640px) {
+  .key { width: 34px; height: 34px; font-size: 13px; }
+  .lamp { width: 30px; height: 30px; font-size: 12px; }
+  .kb-row { gap: 5px; }
+  .lampboard, .keyboard { gap: 6px; }
+  .rotor-row { grid-template-columns: 128px 1fr; }
+  .face { grid-template-columns: 40px 1fr; gap: 4px; }
+  .face-label { font-size: 8.5px; }
+  .cell { font-size: 9px; padding: 1px 0; }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "enigma-simulator",
+  "version": "0.1.0",
+  "description": "Interaktivní simulátor šifrovacího stroje Enigma I (rotory I/II/III, reflektor B, plugboard) — lokálně i na GitHub Pages",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "serve": "node scripts/serve.js",
+    "build:offline": "node scripts/build-single-file.js"
+  },
+  "license": "MIT"
+}

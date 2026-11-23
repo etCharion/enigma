@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ENIGMA I · simulátor</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css?v=4">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>ENIGMA&nbsp;I</h1>
+</header>
+
+<main class="layout">
+
+  <!-- zářivé linky cesty signálu — kreslí je app.js přes celé rozložení -->
+  <svg class="path-overlay" id="path-overlay" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="wire-glow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="3.4" />
+      </filter>
+    </defs>
+    <g id="wires"></g>
+  </svg>
+
+  <!-- ══ NASTAVENÍ ══ -->
+  <section class="panel settings" aria-label="Nastavení stroje">
+    <div class="panel-head">
+      <h2>Nastavení stroje</h2>
+      <details class="help">
+        <summary aria-label="Nápověda k nastavení" title="Nápověda">?</summary>
+        <div class="help-body">
+          <p><b>Rychlý mód</b> &mdash; stiskneš písmeno a signál projde celý: rozsvítí se lampa
+            a znak se připíše do výstupu.</p>
+          <p><b>Pozorování krok za krokem</b> &mdash; po stisku projdeš cestu po krocích tlačítkem
+            <b>Další krok</b> nebo <b>Přehrát</b>; každý krok má svou barvu.</p>
+          <p>Signál jde vždy <b>od pravého kola</b> k levému a zpět &mdash; čísla I/II/III jsou jen
+            označení zapojení, ne pořadí.</p>
+          <p>Krokování je zjednodušené (bez double-stepu). Kontrola výchozího nastavení:
+            <code>AAAAA</code> &rarr; <code>BDZGO</code>.</p>
+        </div>
+      </details>
+    </div>
+
+    <div class="mode-switch" role="tablist" aria-label="Mód zobrazení">
+      <button id="mode-fast" class="mode-btn active" type="button" role="tab" aria-selected="true">&#9889;&nbsp; Rychlý mód</button>
+      <button id="mode-observe" class="mode-btn" type="button" role="tab" aria-selected="false">&#128269;&nbsp; Pozorování krok za krokem</button>
+    </div>
+
+    <div class="setting-group">
+      <h3>Pořadí rotorů</h3>
+      <div class="rotor-order">
+        <label>Levé
+          <select id="sel-left" aria-label="Levé kolo"></select>
+        </label>
+        <label>Střední
+          <select id="sel-middle" aria-label="Střední kolo"></select>
+        </label>
+        <label>Pravé
+          <select id="sel-right" aria-label="Pravé kolo"></select>
+        </label>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <h3>Počáteční pozice kol</h3>
+      <div class="positions">
+        <div class="pos-ctl" data-slot="0">
+          <span class="pos-label">Levé</span>
+          <button class="pos-btn pos-up" type="button" aria-label="Levé kolo nahoru">&#9650;</button>
+          <input id="pos-left" maxlength="1" value="A" aria-label="Pozice levého kola">
+          <button class="pos-btn pos-down" type="button" aria-label="Levé kolo dolů">&#9660;</button>
+        </div>
+        <div class="pos-ctl" data-slot="1">
+          <span class="pos-label">Střední</span>
+          <button class="pos-btn pos-up" type="button" aria-label="Střední kolo nahoru">&#9650;</button>
+          <input id="pos-middle" maxlength="1" value="A" aria-label="Pozice středního kola">
+          <button class="pos-btn pos-down" type="button" aria-label="Střední kolo dolů">&#9660;</button>
+        </div>
+        <div class="pos-ctl" data-slot="2">
+          <span class="pos-label">Pravé</span>
+          <button class="pos-btn pos-up" type="button" aria-label="Pravé kolo nahoru">&#9650;</button>
+          <input id="pos-right" maxlength="1" value="A" aria-label="Pozice pravého kola">
+          <button class="pos-btn pos-down" type="button" aria-label="Pravé kolo dolů">&#9660;</button>
+        </div>
+      </div>
+      <button id="btn-reset-pos" type="button" class="small-btn">Reset pozic na AAA</button>
+    </div>
+  </section>
+
+  <!-- ══ ROTORY + REFLEKTOR ══ -->
+  <section class="panel rotors-panel" aria-label="Rotory a reflektor">
+    <div class="panel-head">
+      <h2>Rotory a reflektor</h2>
+      <details class="help">
+        <summary aria-label="Nápověda k rotorům" title="Nápověda">?</summary>
+        <div class="help-body">
+          <p>Každé kolo má <b>dvě sady kontaktů</b>: stranu <b>P</b> (pravá &mdash; signál sem
+            vstupuje) a stranu <b>L</b> (levá &mdash; odtud vystupuje). Mezi nimi vede
+            <b>26 drátků</b>: každý spojuje jednu zdířku strany P s jednou zdířkou strany L.
+            Dvojici přečteš tak, že z písmene sjedeš po drátku dolů.</p>
+          <p>Dolů k reflektoru jde cesta <b>P&nbsp;&rarr;&nbsp;L</b>, zpátky nahoru
+            <b>L&nbsp;&rarr;&nbsp;P</b>. <b>Reflektor</b> má propojky pevné &mdash; neotáčí se,
+            takže pár (<span class="mono">A&nbsp;&harr;&nbsp;Y</span>) najdeš stále ve stejných
+            sloupcích.</p>
+          <p>Když se kolo otočí o zub, <b>otočí se celý svazek drátků</b> &mdash; ujede o jednu
+            buňku doleva a drátek z levého kraje se objeví vpravo; <b>písmena obou pásů přitom
+            zůstávají na místě</b>.</p>
+          <p>Číslo u řádku udává pořadí, v jakém tudy signál prochází &mdash; začíná se vždy
+            vpravo. Každý krok cesty má svou barvu: rozsvítí se obě písmenka i drátek, kterým
+            signál prošel.</p>
+        </div>
+      </details>
+    </div>
+    <div class="rotor-stack" id="rotor-stack"><!-- řádky generuje JS --></div>
+  </section>
+
+  <!-- ══ PLUGBOARD ══ -->
+  <section class="panel plugboard-panel" aria-label="Plugboard">
+    <div class="panel-head">
+      <h2>Plugboard</h2>
+      <details class="help">
+        <summary aria-label="Nápověda k plugboardu" title="Nápověda">?</summary>
+        <div class="help-body">
+          <p>Klikni na dvě zdířky &rarr; kabel. <b>Čárkovaně</b> je kabel, který teprve vyrábíš,
+            <b>plně a se září</b> hotový kabel.</p>
+          <p>Každé písmeno má jen jeden kabel. Klikni na kabel v seznamu &rarr; odebereš ho
+            (<code>Esc</code> ruší rozpracovaný kabel).</p>
+        </div>
+      </details>
+    </div>
+    <div class="plugboard" id="plugboard">
+      <svg class="cables" id="cables" aria-hidden="true"></svg>
+      <!-- zdířky generuje JS -->
+    </div>
+    <ul class="plug-list" id="plug-list"></ul>
+  </section>
+
+  <!-- ══ STROJ: VSTUP + POZOROVÁNÍ + VÝSTUP │ LAMPOVNÍK + KLÁVESNICE │ KROKOVÁNÍ + HISTORIE ══ -->
+  <section class="panel machine-panel" aria-label="Stroj">
+    <div class="machine-grid">
+
+      <div class="machine-side">
+        <div class="mini-box">
+          <h3>Vstup</h3>
+          <textarea id="text-input" rows="3" placeholder="Text (jen A–Z)…"></textarea>
+          <div class="row">
+            <button id="btn-encrypt-text" type="button" class="small-btn">Zašifrovat text</button>
+            <button id="btn-clear" type="button" class="small-btn">Vyčistit výstup</button>
+          </div>
+        </div>
+        <div class="mini-box">
+          <h3>Pozorování cesty</h3>
+          <p class="step-caption" id="step-caption">Stiskni písmeno…</p>
+        </div>
+        <div class="mini-box">
+          <h3>Výstup</h3>
+          <textarea id="text-output" rows="3" readonly placeholder="…"></textarea>
+        </div>
+      </div>
+
+      <div class="machine-center">
+        <div class="lampboard" id="lampboard" aria-label="Lampovník"></div>
+        <div class="keyboard" id="keyboard" aria-label="Klávesnice"></div>
+      </div>
+
+      <div class="machine-side machine-side-right">
+        <div class="mini-box">
+          <h3>Krokování</h3>
+          <div class="step-buttons controls">
+            <button id="btn-step" type="button" disabled>&#9654; Další krok</button>
+            <button id="btn-play" type="button" disabled>&#9193; Přehrát</button>
+            <button id="btn-reset-path" type="button" disabled>&#8634; Reset cesty</button>
+          </div>
+        </div>
+        <div class="mini-box">
+          <h3>Historie</h3>
+          <ul class="history" id="history"></ul>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
