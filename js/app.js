@@ -19,6 +19,15 @@ const CABLE_COLORS = ['#d8b13c', '#c96f4a', '#7fa35a', '#5a8fa3', '#a37fc9', '#c
 const PATH_COLORS = ['#ffd166', '#ff9b52', '#ff6b6b', '#f473c8', '#b48cff',
   '#6aa9ff', '#3fd6cf', '#7fe07a', '#d9e85a'];
 const STEP_DEG = 360 / 26;
+// Jak se kreslí spojnice mezi součástmi (plugboard ↔ kolo, reflektor ↔ kolo).
+// 'orig' = původní přímá/oblouková spojnice, 'A' = kolmé uličky mimo pásy písmen,
+// 'B' = totéž se zaoblenými rohy a tečkami, 'C' = jen krátké nožičky s tečkami.
+const LINK_MODES = {
+  orig: 'Původní: spojnice z písmene na písmeno — u plugboardu běžně vede přes celý pás abecedy.',
+  A: 'Uličky: spojnice obejde písmena — vede nad pásem P, pod pásem L a mezerou mezi panely.',
+  B: 'Křivky: stejné uličky jako A, ale s plynulými oblouky a tečkami na koncích.',
+  C: 'Visačky: z každého konce jen krátká nožička s tečkou — zbytek spojení nese barva kroku.',
+};
 // pás drátků mezi pásy P a L: při kroku kola se celý svazek otočí o jednu
 // buňku (drátek z levého kraje přejede na pravý konec), písmena pásů stojí.
 const WIRE_H = 46;            // výška pásu drátků v px (stejná jako v CSS)
@@ -36,6 +45,7 @@ const WIRE_LIT_W = 2.8;
 const machine = new EnigmaMachine();
 const state = {
   mode: 'fast',
+  linkMode: 'A',        // vedení spojnic mezi součástmi: 'orig' | 'A' | 'B' | 'C'
   obs: null,            // { res, idx, timer, done } — právě pozorovaná cesta
   selectedPlug: null,   // vybraná zdířka plugboardu (rozpracovaný kabel = čárkovaný)
   hoverPlug: null,      // zdířka pod kurzorem (náhled kabelu)
@@ -390,16 +400,22 @@ function slideWireField(slot) {
 }
 
 /**
- * Index drátku, kterým signál prošel. Drátek je jeden fyzický spoj — záleží
- * jen na obou koncích, ne na směru cesty (reflektor kreslí oba směry zrcadlově).
+ * Index drátku, kterým signál prošel. Drátek je fyzický spoj od zdířky na
+ * straně P (nahoře) ke zdířce na straně L (dole) — a na směru cesty záleží:
+ * při zpětném průchodu signál do kola vstupuje stranou L, takže hledaná
+ * zdířka strany P je `to` a zdířka strany L je `from`.
+ *
+ * Dřív se hledalo nejdřív jako (from, to) a teprve pak obráceně. To u kola,
+ * jehož zapojení obsahuje dvoucyklus (např. rotor II má G↔R), vybralo drátek
+ * zrcadlově: svítila písmena R/G, ale linka vedla z G do R, tedy mezi dvěma
+ * nesvítícími písmeny. Proto se směr bere z `direction` a nic se nehádá.
  */
-function wireIndexOf(slot, from, to) {
+function wireIndexOf(slot, from, to, direction) {
   const geo = wirePairs(slot);
-  const a = ALPHABET.indexOf(from);
-  const b = ALPHABET.indexOf(to);
-  let k = geo.findIndex(({ top, bottom }) => top === a && bottom === b);
-  if (k < 0) k = geo.findIndex(({ top, bottom }) => top === b && bottom === a);
-  return k;
+  const back = direction === 'backward';
+  const a = ALPHABET.indexOf(back ? to : from);      // zdířka strany P
+  const b = ALPHABET.indexOf(back ? from : to);      // zdířka strany L
+  return geo.findIndex(({ top, bottom }) => top === a && bottom === b);
 }
 
 /**
@@ -792,7 +808,7 @@ function showPathStep(node, i) {
   const overWire = !isPlug;
   if (overWire) {
     const slot = node.stage === 'reflector' ? 'reflector' : node.slot;
-    const k = wireIndexOf(slot, node.from, node.to);
+    const k = wireIndexOf(slot, node.from, node.to, node.direction);
     if (k >= 0) {
       state.wireLit.push({ slot, k, color });
       paintWireLights(slot);
@@ -813,13 +829,14 @@ function drawWires() {
   group.textContent = '';
   if (!state.wires.length) return;
 
-  const center = (el) => {
+  /** Obdélník prvku v souřadnicích overlaye (1:1 s CSS pixely). */
+  const boxOf = (el) => {
     const r = el.getBoundingClientRect();
     return {
-      cx: r.left - hb.left + r.width / 2,
-      cy: r.top - hb.top + r.height / 2,
-      w: r.width,
-      h: r.height,
+      l: r.left - hb.left, t: r.top - hb.top,
+      r: r.left - hb.left + r.width, b: r.top - hb.top + r.height,
+      cx: r.left - hb.left + r.width / 2, cy: r.top - hb.top + r.height / 2,
+      w: r.width, h: r.height,
     };
   };
   // spojnice vychází z okraje písmenka (nahoru/dolů, případně do stran),
@@ -831,7 +848,25 @@ function drawWires() {
     }
     return { x: box.cx + Math.sign(other.cx - box.cx) * (box.w / 2 + 1), y: box.cy };
   };
-  const add = (aBox, bBox, color, cls) => {
+  const path = (d, color, cls) => {
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('stroke', color);
+    p.setAttribute('class', cls);
+    group.appendChild(p);
+    return p;
+  };
+  const dot = (pt, color, r = 2.6) => {
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', pt.x.toFixed(1));
+    c.setAttribute('cy', pt.y.toFixed(1));
+    c.setAttribute('r', String(r));
+    c.setAttribute('fill', color);
+    c.setAttribute('class', 'wire-dot');
+    group.appendChild(c);
+  };
+  /** Původní spojnice: jedna kvadratická křivka z okraje na okraj. */
+  const drawArc = (aBox, bBox, color, cls) => {
     const a = exitPoint(aBox, bBox);
     const b = exitPoint(bBox, aBox);
     const dx = b.x - a.x, dy = b.y - a.y;
@@ -839,32 +874,163 @@ function drawWires() {
     const bow = Math.min(26, len * 0.14) * (cls.includes('link') ? 1 : 0.5);
     const cx = (a.x + b.x) / 2 - (dy / len) * bow;
     const cy = (a.y + b.y) / 2 + (dx / len) * bow;
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
-    p.setAttribute('stroke', color);
-    p.setAttribute('class', cls);
-    group.appendChild(p);
+    path(`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, color, cls);
   };
-  const dot = (pt, color) => {
-    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    c.setAttribute('cx', pt.x.toFixed(1));
-    c.setAttribute('cy', pt.y.toFixed(1));
-    c.setAttribute('r', '2.6');
-    c.setAttribute('fill', color);
-    c.setAttribute('class', 'wire-dot');
-    group.appendChild(c);
+  const polyline = (pts, color, cls) => path(
+    pts.map((p, i) => `${i ? 'L' : 'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' '),
+    color, cls,
+  );
+  /** Spojnice se zaoblenými rohy — varianta B. */
+  const roundedLine = (pts, color, cls, radius = 10) => {
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) {
+      const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      if (!p2) { d += ` L ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`; break; }
+      const d1 = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      const d2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      if (d1 < 2 || d2 < 2) { d += ` L ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`; continue; }
+      const rr = Math.min(radius, d1 / 2, d2 / 2);
+      const a = { x: p1.x + ((p0.x - p1.x) / d1) * rr, y: p1.y + ((p0.y - p1.y) / d1) * rr };
+      const b = { x: p1.x + ((p2.x - p1.x) / d2) * rr, y: p1.y + ((p2.y - p1.y) / d2) * rr };
+      d += ` L ${a.x.toFixed(1)} ${a.y.toFixed(1)}`
+        + ` Q ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+    }
+    path(d, color, cls);
+  };
+
+  // ── překážky: obdélníky písmen, které spojnice nemá křížit ───────────────
+  const obstacles = [];
+  for (const slot of DISPLAY_ROWS) {
+    for (const side of ['p', 'l']) {
+      for (const el of faceCols[slot][side]) {
+        const b = boxOf(el);
+        obstacles.push({ l: b.l - 0.5, t: b.t - 0.5, r: b.r + 0.5, b: b.b + 0.5 });
+      }
+    }
+  }
+  /** Protíná úsečka některé písmeno? (Liang–Barsky) */
+  const hitsLetter = (p1, p2) => {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    for (const c of obstacles) {
+      let t0 = 0, t1 = 1;
+      const clip = (p, q) => {
+        if (p === 0) return q >= 0;
+        const t = q / p;
+        if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+        else { if (t < t0) return false; if (t < t1) t1 = t; }
+        return true;
+      };
+      if (clip(-dx, p1.x - c.l) && clip(dx, c.r - p1.x)
+        && clip(-dy, p1.y - c.t) && clip(dy, c.b - p1.y)) return true;
+    }
+    return false;
+  };
+  const crossesLetters = (pts) => pts.some((p, i) => i > 0 && hitsLetter(pts[i - 1], p));
+
+  /**
+   * Odkud spojnice u prvku vychází a kterou volnou „uličkou“ vede:
+   * nad pásem P, pod pásem L, nad/pod řadou zdířek. `entry` je bod na okraji
+   * písmene, `corridor` je y volného pruhu, `toward` směr, kterým pruh leží.
+   */
+  const anchorOf = (el) => {
+    const b = boxOf(el);
+    if (el.classList.contains('socket')) {
+      const pb = boxOf($('#plugboard'));
+      const top = b.cy < pb.cy;
+      return {
+        b, kind: 'socket',
+        entry: { x: b.cx, y: top ? b.t - 1 : b.b + 1 },
+        corridor: top ? b.t - 6 : b.b + 6,
+        toward: top ? -1 : 1,
+      };
+    }
+    const row = boxOf(el.closest('.rotor-row'));
+    const isP = !!el.closest('.face-p');
+    return {
+      b, kind: isP ? 'p' : 'l',
+      entry: { x: b.cx, y: isP ? b.t - 1 : b.b + 1 },
+      corridor: isP ? row.t + 3.5 : row.b - 3.5,
+      toward: isP ? -1 : 1,
+      row,
+    };
+  };
+
+  /** Svislý pruh mezi panely (nebo za koncem pásů), kterým spojnice přejede jinam. */
+  const laneX = (a1, a2, seq) => {
+    const pbEl = $('#plugboard');
+    const pb = pbEl ? boxOf(pbEl) : null;
+    const stack = boxOf($('#rotor-stack'));
+    let lo, hi;
+    if (pb && (a1.kind === 'socket' || a2.kind === 'socket') && pb.l - stack.r > 18) {
+      lo = stack.r + 5; hi = pb.l - 5;
+    } else {
+      const last = boxOf(faceCols.right.p[25]);
+      lo = last.r + 5; hi = last.r + 15;
+    }
+    const mid = (lo + hi) / 2;
+    const spread = (seq % 3) - 1;
+    return mid + spread * Math.min(7, Math.max(0, (hi - lo) / 5));
+  };
+
+  const dedupe = (pts) => pts.filter((p, i) => i === 0
+    || Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) > 0.6);
+
+  // ── spojnice mezi dvěma komponentami ─────────────────────────────────────
+  let linkSeq = 0;
+  const link = (fromEl, toEl, color) => {
+    const A = anchorOf(fromEl);
+    const B = anchorOf(toEl);
+    const p = exitPoint(A.b, B.b);
+    const q = exitPoint(B.b, A.b);
+    const mode = state.linkMode;
+    // krátkou spojnici mezi dvěma sousedními pásy necháme rovnou (kolo ↔ kolo);
+    // dlouhé přeskoky mezi panely vždy vedou uličkou, i když zrovna nic nekříží
+    const short = Math.hypot(q.x - p.x, q.y - p.y) < 90;
+    if (short && !hitsLetter(p, q)) {
+      if (mode === 'orig') { drawArc(A.b, B.b, color, 'wire-link'); return; }
+      polyline([p, q], color, 'wire-link');
+      dot(p, color, 2.2);
+      dot(q, color, 2.2);
+      return;
+    }
+    if (mode === 'orig') { drawArc(A.b, B.b, color, 'wire-link'); return; }
+    if (mode === 'C') {               // jen krátké nožičky s tečkou na konci
+      for (const a of [A, B]) {
+        const tip = { x: a.entry.x, y: a.entry.y + a.toward * 11 };
+        polyline([a.entry, tip], color, 'wire-stub');
+        dot(tip, color, 2.8);
+      }
+      return;
+    }
+    // A / B: kolmo uličkami mimo pásy písmen
+    const lane = laneX(A, B, linkSeq++);
+    const pts = dedupe([
+      A.entry,
+      { x: A.entry.x, y: A.corridor },
+      { x: lane, y: A.corridor },
+      { x: lane, y: B.corridor },
+      { x: B.entry.x, y: B.corridor },
+      B.entry,
+    ]);
+    if (crossesLetters(pts)) {        // pojistka: radši přímá spojnice než přes písmena
+      drawArc(A.b, B.b, color, 'wire-link');
+      return;
+    }
+    if (mode === 'B') roundedLine(pts, color, 'wire-link');
+    else polyline(pts, color, 'wire-link');
+    dot(A.entry, color, 2.2);
+    dot(B.entry, color, 2.2);
   };
 
   for (const w of state.wires) {
     if (!w.fromEl || !w.toEl) continue;
-    const a = center(w.fromEl);
-    const b = center(w.toEl);
-    const prev = w.linkFrom ? center(w.linkFrom) : null;
-    if (prev) add(prev, a, w.color, 'wire-link'); // propojení mezi dvěma součástmi
+    const a = boxOf(w.fromEl);
+    const b = boxOf(w.toEl);
+    if (w.linkFrom) link(w.linkFrom, w.fromEl, w.color); // propojení mezi dvěma součástmi
     if (w.skipArc) continue; // plugboard: kabel na desce už spojení ukazuje
     if (Math.hypot(b.cx - a.cx, b.cy - a.cy) > 3) {
-      add(a, b, w.color, 'wire-halo');  // rozostřené světlo
-      add(a, b, w.color, 'wire');       // ostrá linka
+      drawArc(a, b, w.color, 'wire-halo');  // rozostřené světlo
+      drawArc(a, b, w.color, 'wire');       // ostrá linka
       dot(exitPoint(a, b), w.color);
       dot(exitPoint(b, a), w.color);
     }
@@ -1020,6 +1186,25 @@ function setMode(mode) {
     : 'Stiskni písmeno a projdi cestu <b>Další krok</b>.');
 }
 
+/** Přepínač vedení spojnic (ukázka A / B / C vedle původního stavu). */
+function setLinkMode(mode) {
+  if (!LINK_MODES[mode]) return;
+  state.linkMode = mode;
+  $$('.link-btn').forEach((b) => {
+    const on = b.dataset.linkMode === mode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  const hint = $('#link-hint');
+  if (hint) hint.textContent = LINK_MODES[mode];
+  drawWires(); // právě rozsvícená cesta se hned překreslí novým vedením
+}
+
+function buildLinkSwitch() {
+  $$('.link-btn').forEach((b) => b.addEventListener('click', () => setLinkMode(b.dataset.linkMode)));
+  setLinkMode(state.linkMode);
+}
+
 function onEncryptText() {
   if (state.obs) { setCaption('Nejprve projdi aktuální cestu (nebo Reset cesty).'); return; }
   const text = $('#text-input').value;
@@ -1056,6 +1241,7 @@ function init() {
   renderWindows(true);
   buildPlugboard();
   buildKeyboardAndLamps();
+  buildLinkSwitch();
 
   $('#mode-fast').addEventListener('click', () => setMode('fast'));
   $('#mode-observe').addEventListener('click', () => setMode('observe'));
