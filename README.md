@@ -32,11 +32,6 @@ Viz [PLAN.md](PLAN.md) — kompletní plán projektu, pravidla jádra, testovac�
   přerušovaná = přechod mezi součástmi). V pozorovacím módu se spojnice přidávají krok za krokem,
   v rychlém módu celá cesta problikne.
 - **Číslo u každého řádku** (`1`, `2`, `3`, `↕`) udává pořadí, v jakém tudy signál prochází.
-- **Vedení spojnic cesty** (přepínač v nastavení): `A · uličky` (výchozí) vede spojnice mezi
-  součástmi mimo písmena — nad pásem P, pod pásem L a mezerou mezi panely; `B · křivky` je totéž
-  s plynulými oblouky a tečkami; `C · visačky` nechá u konců jen krátkou nožičku s tečkou
-  (spojení nese barva kroku) a `Původní` je stav před opravou, kdy spojnice běžně křížila celý
-  pás abecedy — hodí se pro srovnání ve výuce.
 - **Drátek uvnitř kola** se hledá podle směru: dopředu spojuje zdířku pásu P (nahoře) se zdířkou
   pásu L (dole), zpět naopak. Rozsvítí se vždy právě ten drátek, který spojuje obě svítící
   písmena — i u kol se dvoucyklem v zapojení (rotor I: I↔V, J↔Z; rotor II: B↔J, G↔R, N↔T).
